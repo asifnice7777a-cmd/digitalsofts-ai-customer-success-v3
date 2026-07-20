@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DigitalSofts AI Customer Success Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="ambient-glow" aria-hidden="true"></div>
+
+<div class="chat-app">
+
+  <header class="chat-header">
+    <div class="brand">
+      <span class="brand-mark">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="currentColor"/>
+        </svg>
+      </span>
+      <div class="brand-text">
+        <h1>DigitalSofts AI Assistant</h1>
+        <p class="brand-subtitle"><span class="status-dot" aria-hidden="true"></span>Online &middot; Customer Success</p>
+      </div>
+    </div>
+    <button id="resetBtn" class="reset-btn" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 4V9H4.58152M19.9381 11C19.446 7.05369 16.0796 4 12 4C8.64262 4 5.76829 6.06817 4.58152 9M4.58152 9H9M20 20V15H19.4185M19.4185 15C18.2317 17.9318 15.3574 20 12 20C7.92038 20 4.55399 16.9463 4.06189 13M19.4185 15H15"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Reset
+    </button>
+  </header>
+
+  <div id="chatWindow" class="chat-window"></div>
+
+  <div id="loadingIndicator" class="loading-indicator hidden">
+    <span class="typing-dots"><i></i><i></i><i></i></span>
+    Assistant is typing
+  </div>
+
+  <form id="chatForm" class="chat-input-form">
+    <input type="text" id="messageInput" placeholder="Ask about services, pricing, or book a meeting..." autocomplete="off" required>
+    <button type="submit" id="sendBtn" aria-label="Send message">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 12H20M20 12L14 6M20 12L14 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </form>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
