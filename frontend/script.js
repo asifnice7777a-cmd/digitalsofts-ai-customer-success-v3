@@ -69,3 +69,69 @@ resetBtn.addEventListener("click", async () => {
 window.addEventListener("DOMContentLoaded", () => {
   appendMessage("assistant", "Hi! I'm the DigitalSofts AI assistant. Ask me about our services, pricing, technical capabilities, or book a meeting.");
 });
+
+/* ============================================================
+   Floating chat widget — open/close behavior only.
+   No chat API logic is touched above this point; this section
+   only toggles visibility of the existing widget markup and,
+   the first time it opens, focuses the existing message input.
+   ============================================================ */
+(function initChatWidget() {
+  const launcher = document.getElementById("chatLauncher");
+  const widget = document.getElementById("chatWidget");
+  const closeBtn = document.getElementById("closeChatBtn");
+  const heroCta = document.getElementById("heroChatCta");
+
+  function openWidget() {
+    widget.classList.remove("hidden");
+    launcher.classList.add("is-open");
+    launcher.setAttribute("aria-expanded", "true");
+    setTimeout(() => messageInput.focus(), 150);
+  }
+
+  function closeWidget() {
+    widget.classList.add("hidden");
+    launcher.classList.remove("is-open");
+    launcher.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleWidget() {
+    if (widget.classList.contains("hidden")) {
+      openWidget();
+    } else {
+      closeWidget();
+    }
+  }
+
+  launcher.addEventListener("click", toggleWidget);
+  closeBtn.addEventListener("click", closeWidget);
+
+  if (heroCta) {
+    heroCta.addEventListener("click", () => {
+      if (widget.classList.contains("hidden")) openWidget();
+    });
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !widget.classList.contains("hidden")) {
+      closeWidget();
+    }
+  });
+})();
+
+/* ============================================================
+   Contact form — front-end only, no backend endpoint exists for
+   this form, so it simply shows a confirmation message locally
+   rather than calling an API.
+   ============================================================ */
+(function initContactForm() {
+  const contactForm = document.getElementById("contactForm");
+  const contactConfirm = document.getElementById("contactConfirm");
+  if (!contactForm) return;
+
+  contactForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    contactConfirm.classList.remove("hidden");
+    contactForm.reset();
+  });
+})();
