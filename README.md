@@ -1,389 +1,190 @@
-# DigitalSofts AI Customer Success Agent
+# DigitalSofts Agentic Customer Success System
 
-An autonomous, multi-agent AI Customer Success system built for the DigitalSofts AI Engineering Internship assignment. The system routes client conversations to specialized agents (Sales, Technical, Documentation, Meeting), grounds responses in a company knowledge base using Retrieval-Augmented Generation, lets the LLM decide which tools to invoke, and self-evaluates its own output quality with a single automatic retry.
+An AI-powered multi-agent customer success system built for the DigitalSofts AI Engineering Internship assignment. The system answers company-related questions using Retrieval-Augmented Generation (RAG), routes requests through specialized AI agents, books meetings, generates proposal summaries, estimates project cost and timeline, and maintains conversation memory.
 
-This README documents the system as it is actually implemented — architecture, features, limitations, and design rationale — for technical reviewers evaluating engineering quality and AI system design.
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-REST%20API-009688?logo=fastapi&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-Agent%20Orchestration-1C3C3C)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)
+
+Repository: <YOUR_GITHUB_REPO_LINK>
 
 ---
 
-## Badges
+## Table of Contents
 
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi&logoColor=white)
-![LangGraph](https://img.shields.io/badge/LangGraph-Orchestration-1C3C3C)
-![LangChain](https://img.shields.io/badge/LangChain-Tool%20Calling-1C3C3C)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-pytest-0A9EDC?logo=pytest&logoColor=white)
+1. [Project Overview](#project-overview)
+2. [Features](#features)
+3. [System Architecture](#system-architecture)
+4. [Architecture Diagram](#architecture-diagram)
+5. [Tech Stack](#tech-stack)
+6. [Project Structure](#project-structure)
+7. [Installation](#installation)
+8. [Environment Variables](#environment-variables)
+9. [Running Locally](#running-locally)
+10. [Docker Usage](#docker-usage)
+11. [API Documentation](#api-documentation)
+12. [Agent Workflow](#agent-workflow)
+13. [RAG Pipeline](#rag-pipeline)
+14. [Conversation Memory](#conversation-memory)
+15. [Tool Calling](#tool-calling)
+16. [Testing](#testing)
+17. [Logging and Error Handling](#logging-and-error-handling)
+18. [Future Improvements](#future-improvements)
+19. [License](#license)
 
 ---
 
 ## Project Overview
 
-DigitalSofts needed an AI-driven customer success assistant capable of answering sales, technical, documentation, and scheduling queries without human intervention. This project implements that assistant as a **graph-orchestrated multi-agent system**:
+DigitalSofts required an AI-driven customer success assistant capable of handling sales, technical, documentation, and scheduling conversations autonomously. This project implements that assistant as a supervisor-orchestrated multi-agent system:
 
-- A **supervisor** classifies each incoming message and extracts client profile details.
-- The message is routed to one of four **specialized agents**, each scoped to its own tools.
-- Agents use **LLM-driven tool calling** (via `bind_tools`) to decide, at inference time, whether to query the knowledge base, estimate cost/timeline, generate a proposal, or book a meeting.
-- Responses are passed through a **rule-based evaluation node** that scores confidence and triggers a single retry if the response looks incomplete.
-- All of this is exposed through a **FastAPI** backend with a minimal HTML/CSS/JS chat frontend.
-
-The system is built to be inspectable end-to-end: every routing decision, tool call, and evaluation outcome is logged and traceable.
+- A **LangGraph Supervisor** classifies each incoming message and routes it to the correct specialist agent.
+- Four **specialized agents** — Sales, Technical Consultant, Documentation, and Meeting Coordinator — handle domain-specific conversations, each with its own set of tools.
+- A **RAG pipeline** grounds company-related answers using PostgreSQL with the pgvector extension.
+- **Conversation memory** persists client profile data and session state in PostgreSQL, shared across all agents.
+- The system is exposed through a **FastAPI** REST API with a lightweight HTML/CSS/JavaScript chat frontend.
 
 ---
 
-## Assignment Coverage
+## Features
 
-| Requirement | Status |
+| Feature | Description |
 |---|---|
-| RAG Knowledge Base | ✅ |
-| Multi-Agent Architecture | ✅ |
-| Tool Calling | ✅ |
-| Conversation Memory | ✅ |
-| Evaluation & Self-Correction | ✅ |
-| FastAPI Backend | ✅ |
-| Basic Frontend | ✅ |
-| Logging | ✅ |
-| Error Handling | ✅ |
-| Docker | ✅ |
-| Unit Tests | ✅ |
-| README | ✅ |
-| Architecture Diagram | ✅ |
-| API Documentation | ✅ |
+| Multi-Agent Routing | Supervisor-based routing to Sales, Technical, Documentation, and Meeting agents |
+| Retrieval-Augmented Generation (RAG) | Semantic search over a PostgreSQL knowledge base using pgvector |
+| Conversation Memory | Client profile and session history persisted in PostgreSQL |
+| Tool Calling | Agents invoke domain-specific tools to complete tasks |
+| Project Proposal Generation | Automated proposal summary generation |
+| Meeting Booking | Meeting scheduling with email confirmation |
+| Cost Estimation | Project cost estimation based on scope |
+| Timeline Estimation | Project delivery timeline estimation |
+| Logging | Structured application logging |
+| Error Handling | Graceful handling of agent and API failures |
+| Docker Support | Containerized deployment |
+| Unit Tests | Automated test coverage for core components |
+| FastAPI REST API | Documented HTTP endpoints for chat and session management |
+| Basic HTML/CSS/JavaScript Frontend | Browser-based chat interface |
 
-**Bonus Features**
+---
 
-| Bonus Item | Status |
-|---|---|
-| Vector database other than FAISS | ✅ (PostgreSQL + pgvector) |
-| Conversation analytics | ⚠️ Partial — basic usage metrics via `/metrics`, not a full analytics dashboard |
-| Human Handoff | ❌ Not implemented |
-| MCP | ❌ Not implemented |
-| Multiple LLM Providers | ❌ Not implemented — single provider (OpenRouter), model is configurable but there is no provider abstraction layer |
-| Deployment | ❌ Not implemented — Dockerfile only, no live deployment target configured |
+## System Architecture
+
+The system follows a supervisor-based multi-agent design:
+
+- **Frontend (HTML/CSS/JavaScript)** — sends user messages to the backend and renders agent responses.
+- **FastAPI Backend** — exposes the REST API and coordinates request handling.
+- **LangGraph Supervisor** — classifies each message and routes it to exactly one specialist agent:
+  - **Sales Agent** — service and pricing inquiries, using Company Knowledge Search
+  - **Technical Consultant Agent** — technical questions, using Company Knowledge Search, Cost Estimation, and Timeline Estimation
+  - **Documentation Agent** — proposal generation, using Proposal Generation
+  - **Meeting Coordinator Agent** — meeting scheduling, using Meeting Scheduling and Email Confirmation
+
+All agents share two common dependencies:
+
+- **PostgreSQL Conversation Memory** — for reading and updating client profile and session state.
+- **OpenRouter LLM** — for generating natural-language responses.
 
 ---
 
 ## Architecture Diagram
 
-## System Architecture
-                                      ┌─────────────────────────────┐
-                                      │          Client             │
-                                      │   (Web UI / REST API)       │
-                                      └──────────────┬──────────────┘
-                                                     │
-                                            POST /chat Request
-                                                     │
-                                                     ▼
-                         ┌────────────────────────────────────────────────┐
-                         │              FastAPI Backend                   │
-                         │                  (main.py)                     │
-                         └───────────────┬────────────────────────────────┘
-                                         │
-                                         ▼
-                 ┌─────────────────────────────────────────────────────────────┐
-                 │                    Session Memory                           │
-                 │─────────────────────────────────────────────────────────────│
-                 │ • Client Profile                                            │
-                 │ • Conversation History                                      │
-                 │ • Update Memory                                             │
-                 └───────────────┬─────────────────────────────────────────────┘
-                                 │
-                                 ▼
-                 ┌─────────────────────────────────────────────────────────────┐
-                 │              LangGraph Workflow (graph.py)                  │
-                 └───────────────┬─────────────────────────────────────────────┘
-                                 │
-                                 ▼
-          ┌──────────────────────────────────────────────────────────────────────────┐
-          │                  Supervisor Agent (supervisor.py)                        │
-          │──────────────────────────────────────────────────────────────────────────│
-          │ • Intent Detection                                                       │
-          │ • Route Request                                                          │
-          │ • Extract Client Information                                             │
-          │   - Name                                                                 │
-          │   - Company                                                              │
-          │   - Budget                                                               │
-          │   - Timeline                                                             │
-          │   - Preferred Technology                                                 │
-          │   - Project Type                                                         │
-          └──────────────┬────────────────┬────────────────┬────────────────────────┘
-                         │                │                │
-         ┌───────────────▼──────┐ ┌──────▼─────────┐ ┌────▼────────────┐ ┌────────────▼──────────┐
-         │    Sales Agent       │ │ Technical Agent│ │Documentation    │ │   Meeting Agent       │
-         │                      │ │                │ │Agent            │ │                       │
-         └──────────┬───────────┘ └──────┬─────────┘ └────────┬────────┘ └──────────┬───────────┘
-                    │                    │                    │                     │
-                    ▼                    ▼                    ▼                     ▼
-           ┌────────────────┐   ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
-           │ ChatOpenAI LLM │   │ ChatOpenAI LLM │   │ ChatOpenAI LLM │   │ ChatOpenAI LLM │
-           │ (OpenRouter)   │   │ (OpenRouter)   │   │ (OpenRouter)   │   │ (OpenRouter)   │
-           └───────┬────────┘   └──────┬─────────┘   └──────┬─────────┘   └──────┬─────────┘
-                   │                   │                    │                    │
-          bind_tools()         bind_tools()        bind_tools()        bind_tools()
-                   │                   │                    │                    │
-                   ▼                   ▼                    ▼                    ▼
+<!-- Mermaid architecture diagram placeholder -->
+```mermaid
+flowchart LR
+    User([User])
+    Frontend[Frontend<br/>HTML/CSS/JavaScript]
+    FastAPI[FastAPI Backend]
+    Supervisor[LangGraph Supervisor]
 
-      ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  ┌────────────────────┐
-      │ search_company_     │  │ search_company_     │  │ generate_proposal_  │  │ create_meeting_    │
-      │ knowledge()         │  │ knowledge()         │  │ summary()           │  │ request()          │
-      ├─────────────────────┤  ├─────────────────────┤  └─────────────────────┘  └────────────────────┘
-      │ estimate_project_   │  │ estimate_project_   │
-      │ cost()              │  │ timeline()          │
-      └──────────┬──────────┘  └──────────┬──────────┘
-                 │                        │
-                 └──────────────┬─────────┘
-                                ▼
-              ┌───────────────────────────────────────────────┐
-              │        PostgreSQL + pgvector Vector Database    │
-              │                                               │
-              │   DigitalSofts Knowledge Base (RAG Search)    │
-              └──────────────────────────┬────────────────────┘
-                                         │
-                                         ▼
-                      ┌──────────────────────────────────────┐
-                      │    Evaluation & Self-Correction      │
-                      │──────────────────────────────────────│
-                      │ • Verify Completeness                │
-                      │ • Calculate Confidence               │
-                      │ • Retry Once (if confidence is low)  │
-                      │ • Log Retry Reason                   │
-                      └──────────────────┬───────────────────┘
-                                         │
-                                         ▼
-                             ┌────────────────────────┐
-                             │    Final Response      │
-                             └────────────────────────┘
+    SalesAgent[Sales Agent]
+    TechAgent[Technical Consultant Agent]
+    DocAgent[Documentation Agent]
+    MeetingAgent[Meeting Coordinator Agent]
 
+    KnowledgeTool[Company Knowledge Search Tool]
+    CostTool[Cost Estimation Tool]
+    TimelineTool[Timeline Estimation Tool]
+    ProposalTool[Proposal Generation Tool]
+    MeetingTool[Meeting Scheduling Tool]
+    EmailTool[Email Confirmation Tool]
 
-**RAG path (Knowledge Search tool only):**
+    Embeddings[SentenceTransformer Embeddings]
+    VectorStore[(PostgreSQL<br/>pgvector Vector Store)]
 
+    Memory[(PostgreSQL<br/>Conversation Memory)]
+    LLM[OpenRouter LLM]
+
+    User --> Frontend
+    Frontend --> FastAPI
+    FastAPI --> Supervisor
+
+    Supervisor --> SalesAgent
+    Supervisor --> TechAgent
+    Supervisor --> DocAgent
+    Supervisor --> MeetingAgent
+
+    SalesAgent --> KnowledgeTool
+
+    TechAgent --> KnowledgeTool
+    TechAgent --> CostTool
+    TechAgent --> TimelineTool
+
+    DocAgent --> ProposalTool
+
+    MeetingAgent --> MeetingTool
+    MeetingAgent --> EmailTool
+
+    KnowledgeTool --> Embeddings
+    Embeddings --> VectorStore
+
+    SalesAgent --> Memory
+    TechAgent --> Memory
+    DocAgent --> Memory
+    MeetingAgent --> Memory
+
+    SalesAgent --> LLM
+    TechAgent --> LLM
+    DocAgent --> LLM
+    MeetingAgent --> LLM
 ```
-Knowledge Tool → Vector Store (PostgreSQL + pgvector) → Top-K Matches → Agent → LLM
-```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Language | Python |
+| API Framework | FastAPI |
+| Agent Orchestration | LangGraph |
+| LLM Provider | OpenRouter |
+| Embeddings | SentenceTransformers |
+| Vector Store | PostgreSQL + pgvector |
+| Knowledge Base | PostgreSQL |
+| Conversation Memory | PostgreSQL |
+| Database | PostgreSQL |
+| Frontend | HTML, CSS, JavaScript |
+| Containerization | Docker |
 
 ---
 
 ## Project Structure
 
 ```
-DIGITALSOFTS-AGENT/
-├── app/
-│   ├── agents/
-│   │   ├── supervisor.py          # Routing + profile field extraction
-│   │   ├── sales_agent.py         # Sales Agent (pricing, services)
-│   │   ├── technical_agent.py     # Technical Consultant Agent
-│   │   ├── documentation_agent.py # Proposal/documentation Agent
-│   │   └── meeting_agent.py       # Meeting scheduling Agent
-│   ├── memory/
-│   │   └── session_memory.py      # In-memory session store (thread-safe)
-│   ├── rag/
-│   │   ├── knowledge_base.py      # Seed knowledge records
-│   │   └── vector_store.py        # PostgreSQL + pgvector client
-│   ├── config.py                  # Environment-driven settings
-│   ├── evaluation.py              # Rule-based confidence scoring
-│   ├── graph.py                   # LangGraph StateGraph definition
-│   ├── llm.py                     # LLM client + tool-calling loop
-│   ├── logging_config.py          # Logging setup
-│   └── models.py                  # Pydantic request/response schemas
-├── tools/
-│   ├── cost_tool.py                # estimate_project_cost
-│   ├── knowledge_tool.py           # search_company_knowledge
-│   ├── meeting_tool.py             # create_meeting_request
-│   ├── proposal_tool.py            # generate_proposal_summary
-│   └── timeline_tool.py            # estimate_project_timeline
-├── frontend/
-│   ├── index.html
-│   ├── script.js
-│   └── style.css
-├── sql/
-│   └── init_pgvector.sql          # pgvector schema
-├── tests/
-│   ├── test_api.py
-│   ├── test_memory.py
-│   └── test_tools.py
-├── main.py                        # FastAPI application entrypoint
-├── Dockerfile
-├── requirements.txt
-└── .env.example
+app/
+├── agents/       # Supervisor and specialized agent implementations
+├── memory/       # Conversation memory and session persistence
+├── rag/          # Knowledge base and pgvector integration
+├── tools/        # Agent tools (knowledge search, cost, timeline, proposal, meeting, email)
+├── frontend/     # Chat interface (HTML/CSS/JS)
+└── tests/        # Unit tests
+├── docs/
+│   ├── chat-ui.png
+│   ├── swagger.png
+│   └── architecture.png
 ```
-
----
-
-## Technology Stack
-
-**Backend**
-- FastAPI — HTTP API layer
-- Uvicorn — ASGI server
-- Pydantic — request/response and profile schema validation
-
-**AI / Orchestration**
-- LangGraph — stateful multi-agent graph orchestration
-- LangChain (`langchain-openai`, `langchain-core`) — LLM client, `@tool` definitions, `bind_tools` tool calling
-- OpenRouter — LLM provider gateway (default model: `deepseek/deepseek-chat`)
-
-**RAG**
-- PostgreSQL — persistent data store
-- pgvector — vector similarity search extension (cosine distance)
-- Sentence-Transformers (`all-MiniLM-L6-v2`) — text embeddings
-
-**Frontend**
-- Vanilla HTML / CSS / JavaScript — single-page chat widget, no build tooling
-
-**Testing**
-- pytest, FastAPI `TestClient`
-
-**Deployment**
-- Docker (single-container image; no orchestration/hosting configured)
-
----
-
-## Features
-
-### Multi-Agent Workflow
-
-The system is built as a `StateGraph` in `graph.py` with a single entry point (`supervisor`) that fans out to four terminal agent nodes, each of which feeds into a shared `evaluation` node. Each agent node wraps its agent function in a `try/except`, so a failure in one agent (LLM error, tool error) degrades gracefully into a fallback message rather than crashing the request.
-
-### Retrieval-Augmented Generation (RAG)
-
-Company knowledge (services, pricing, FAQs, timelines) lives in `app/rag/knowledge_base.py` as 24 structured records. On first startup, `VectorStore` embeds each record with `SentenceTransformer` and stores it in PostgreSQL as a `vector(384)` column. Queries are embedded the same way and matched using pgvector's `<=>` cosine-distance operator, returning the top-K closest records with a normalized similarity score.
-
-### LLM-Driven Tool Calling
-
-Each agent binds only its own tools to the LLM via `llm.bind_tools([...])`. The LLM — not application code — decides whether a tool is needed, which tool to call, and with what arguments. Python's role is limited to executing the requested tool call and returning the result as a `ToolMessage`, looping until the model produces a final answer or a safety iteration cap is reached. This means, for example, the Sales Agent will only call `estimate_project_cost` when the model judges it relevant to the client's message — not on a fixed Python condition.
-
-### Conversation Memory
-
-`SessionMemory` maintains an in-process dictionary keyed by `session_id`, protected by a `threading.Lock`. Each session holds a `ClientProfile` (name, company, project type, preferred technology, budget, timeline) and a full message history. The supervisor extracts profile fields from every incoming message via regex and merges them into the session so agents can reference known client details without re-asking.
-
-### Evaluation & Self-Correction
-
-After an agent responds, `evaluate_response()` applies a small set of heuristics — response length, presence of error/refusal phrases, and whether a question was left unanswered — to produce a confidence score. If confidence falls below `CONFIDENCE_THRESHOLD` (default `0.75`) and no retry has occurred yet, the graph routes back to the same agent once. This is a **rule-based** quality gate, not a learned or LLM-based evaluator.
-
-### Logging
-
-`logging_config.py` configures Python's standard `logging` module with a consistent format (`timestamp | level | logger | message`), controlled by the `LOG_LEVEL` environment variable. Supervisor routing decisions, agent failures, retry triggers, and vector search errors are all logged.
-
-### Metrics
-
-`main.py` tracks in-memory counters — total requests, total retries, per-agent usage counts, and active session count — exposed via `GET /metrics`. This is basic operational visibility, not a full analytics pipeline.
-
-### Frontend
-
-A single-page chat UI (`frontend/`) served directly by FastAPI. It posts messages to `/chat`, displays which agent answered, shows a loading indicator, and supports resetting the session via `/reset-session`.
-
----
-
-## Agent Workflow
-
-```
-User Message
-     │
-     ▼
-Supervisor
-  - extract_profile_fields() → merge into session profile
-  - route_request()          → keyword match → agent name
-     │
-     ▼
-Agent Selection (sales | technical | documentation | meeting)
-     │
-     ▼
-Tool Calling (LLM decides via bind_tools)
-  - zero, one, or multiple tool calls per turn
-     │
-     ▼
-Evaluation
-  - confidence = f(length, error phrases, unanswered question)
-     │
-     ├── confidence < 0.75 AND retry_count == 0 ──► back to same Agent
-     │
-     ▼
-Final Response
-```
-
----
-
-## RAG Pipeline
-
-```
-knowledge_base.py (24 records)
-          │
-          ▼
-  SentenceTransformer
-  (all-MiniLM-L6-v2, 384-dim)
-          │
-          ▼
-  PostgreSQL + pgvector
-  (vector(384) column, seeded once)
-          │
-          ▼
-   Cosine similarity search
-   (embedding <=> query_embedding)
-          │
-          ▼
-      Top-K matches
-          │
-          ▼
-   search_company_knowledge tool
-          │
-          ▼
-      Agent → LLM → Answer
-```
-
----
-
-## Memory Flow
-
-```
-session_id (generated client-side, per browser session)
-       │
-       ▼
-  SessionMemory.get(session_id)
-       │
-       ▼
-  ClientProfile
-  (name, company, project_type, preferred_technology, budget, timeline)
-       │
-       ▼
-  History (all user + assistant turns, in order)
-       │
-       ▼
-  Reused by agents in system prompts
-  (avoids asking the client to repeat known details)
-```
-
-Memory is **in-process and non-persistent** — it lives for the lifetime of the running server process and is lost on restart.
-
----
-
-## Tool Calling
-
-Every tool is a `@tool`-decorated LangChain function, scoped to exactly one agent.
-
-| Tool | Used By | Purpose |
-|---|---|---|
-| `search_company_knowledge` | Sales, Technical | Semantic search over the pgvector-backed knowledge base; returns top-3 matching records. |
-| `estimate_project_cost` | Sales | Looks up a rate card by project type (web development, mobile app, ERP, AI solution, cloud migration, custom software) and applies a low/medium/high complexity multiplier to produce a cost range in USD. |
-| `estimate_project_timeline` | Technical | Same rate-card pattern as cost estimation, but returns a delivery timeline in weeks. |
-| `generate_proposal_summary` | Documentation | Formats a structured proposal (client, company, project type, budget, timeline) from known client details. |
-| `create_meeting_request` | Meeting | Creates a **mocked** meeting booking — generates a meeting ID and timestamp, but does not integrate with any real calendar or scheduling system. |
-
-Tool selection is entirely LLM-driven per agent; no agent has access to another agent's tools.
-
----
-
-## Evaluation
-
-`evaluate_response(user_message, response)` computes a confidence score using simple, deterministic rules:
-
-1. **Length check** — responses under 20 characters or empty are scored `0.4` and marked incomplete.
-2. **Word count** — fewer than 15 words drops confidence to `0.6` ("Response lacks sufficient detail").
-3. **Error/refusal detection** — presence of `"error"` or `"sorry, i cannot"` caps confidence at `0.5`.
-4. **Unanswered question heuristic** — if the user's message ends in `?`, the response contains no `?`, and is under 25 words, confidence is capped at `0.65`.
-
-If the resulting confidence is below `CONFIDENCE_THRESHOLD` (default `0.75`) and no retry has happened yet for that request, LangGraph routes back to the same agent **exactly once**. A second low-confidence result is accepted as final — there is no unbounded retry loop.
-
-This is intentionally a lightweight, rule-based gate rather than an LLM-as-judge system. It catches obvious failure modes (empty responses, refusals, clearly truncated answers) without adding a second model call per turn.
 
 ---
 
@@ -392,95 +193,76 @@ This is intentionally a lightweight, rule-based gate rather than an LLM-as-judge
 ### Prerequisites
 
 - Python 3.11+
-- PostgreSQL 15+ with the ability to install the `pgvector` extension
+- PostgreSQL instance with the `pgvector` extension enabled
 - An OpenRouter API key
+- Docker (optional, for containerized deployment)
 
-### Windows
+### Setup
 
-```powershell
-git clone <repository-url>
-cd DIGITALSOFTS-AGENT
+```bash
+git clone <YOUR_GITHUB_REPO_LINK>
+cd digitalsofts-agentic-customer-success
 python -m venv venv
-venv\Scripts\activate
-or
-.venv\Scripts\activate
-or 
-cd ..
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env
-```
-
-### Linux / macOS
-
-```bash
-git clone <repository-url>
-cd DIGITALSOFTS-AGENT
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-```
-
-Then edit `.env` and set your `OPENROUTER_API_KEY` and `DATABASE_URL`.
-
-Initialize the database schema:
-
-```bash
-psql "$DATABASE_URL" -f sql/init_pgvector.sql
 ```
 
 ---
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `OPENROUTER_API_KEY` | API key for OpenRouter | *(required, empty by default)* |
-| `OPENROUTER_BASE_URL` | OpenRouter API base URL | `https://openrouter.ai/api/v1` |
-| `MODEL_NAME` | Chat model identifier used for all agents | `deepseek/deepseek-chat` |
-| `EMBEDDING_MODEL` | Sentence-Transformers model for embeddings | `all-MiniLM-L6-v2` |
-| `DATABASE_URL` | PostgreSQL connection string (pgvector-enabled) | `postgresql://postgres:postgres@localhost:5432/digitalsofts` |
-| `CONFIDENCE_THRESHOLD` | Minimum confidence before a retry is triggered | `0.75` |
-| `LOG_LEVEL` | Python logging level | `INFO` |
-| `CHROMA_PERSIST_DIR` | Legacy setting from an earlier ChromaDB-based version; unused since migrating to PostgreSQL + pgvector | `./chroma_db` |
+| Variable | Description |
+|---|---|
+| `OPENROUTER_API_KEY` | API key for the OpenRouter LLM provider |
+| `OPENROUTER_BASE_URL` | Base URL for the OpenRouter API |
+| `MODEL_NAME` | Chat model identifier used by the agents |
+| `EMBEDDING_MODEL` | SentenceTransformers model used for embeddings |
+| `DATABASE_URL` | PostgreSQL connection string (knowledge base, memory, pgvector) |
+| `LOG_LEVEL` | Application logging level |
+
+Copy `.env.example` to `.env` and populate the values above before running the application.
 
 ---
 
-## Running the Application
-pip install -r requirements.txt
+## Running Locally
+
 ```bash
-.venv\Scripts\activate
-uvicorn main:app --reload
-cd digitalsofts-agent
+uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-The chat UI is served at `http://localhost:8000/`. Interactive API docs (via FastAPI's built-in OpenAPI UI) are available at `http://localhost:8000/docs`.
+- API documentation: `http://localhost:8000/docs`
+- Chat frontend: `http://localhost:8000/`
 
 ---
 
-## Docker
+## Docker Usage
 
-**Build:**
+**Build the image:**
 
 ```bash
 docker build -t digitalsofts-agent .
 ```
 
-**Run:**
+**Run the container:**
 
 ```bash
 docker run -p 8000:8000 --env-file .env digitalsofts-agent
 ```
 
-The container expects a reachable PostgreSQL instance (with `pgvector` installed) via `DATABASE_URL`; it is not bundled in the image and must be provisioned separately.
+The container requires a reachable PostgreSQL instance (with `pgvector` enabled) via `DATABASE_URL`.
 
 ---
 
 ## API Documentation
 
-### `POST /chat`
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/chat` | Send a message and receive a routed agent response |
+| `POST` | `/reset-session` | Reset a session's conversation memory |
+| `GET` | `/health` | Health check endpoint |
+| `GET` | `/metrics` | Basic usage metrics |
 
-Send a message and receive an agent-generated reply.
+### POST /chat
 
 **Request**
 
@@ -495,29 +277,18 @@ Send a message and receive an agent-generated reply.
 
 ```json
 {
-  "session_id": "b3f1c2e4-1a2b-4c3d-9e8f-123456789abc",
-  "reply": "Great question! For an AI solution like a chatbot, pricing typically ranges from $10,000 to $40,000 depending on complexity...",
+  "reply": "For an AI chatbot project, pricing typically depends on complexity and integration requirements...",
   "agent": "sales",
   "confidence": 0.9,
   "client_profile": {
     "client_name": null,
     "company": null,
-    "project_type": "ai solution",
-    "preferred_technology": null,
-    "budget": null,
-    "timeline": null
+    "project_type": "ai solution"
   }
 }
 ```
 
-**Errors**
-
-- `400 Bad Request` — empty `message` field.
-- `500 Internal Server Error` — unhandled failure during graph execution.
-
-### `POST /reset-session`
-
-Clears a session's profile and history.
+### POST /reset-session
 
 **Request**
 
@@ -531,52 +302,74 @@ Clears a session's profile and history.
 { "status": "reset", "session_id": "b3f1c2e4-1a2b-4c3d-9e8f-123456789abc" }
 ```
 
-### `GET /health`
-
-**Response**
+### GET /health
 
 ```json
-{ "status": "ok", "timestamp": 1752300000.123 }
+{ "status": "ok" }
 ```
 
-### `GET /metrics`
-
-**Response**
+### GET /metrics
 
 ```json
 {
-  "total_requests": 42,
-  "total_retries": 3,
-  "agent_usage": { "sales": 20, "technical": 12, "documentation": 6, "meeting": 4 },
-  "active_sessions": 5
+  "total_requests": 0,
+  "total_retries": 0,
+  "agent_usage": {},
+  "active_sessions": 0
 }
 ```
 
 ---
 
-## API Endpoints Table
+## Agent Workflow
 
-| Method | Endpoint | Description |
+1. The user sends a message to `/chat`.
+2. The **LangGraph Supervisor** analyzes the message and determines the appropriate agent.
+3. The selected agent (Sales, Technical, Documentation, or Meeting) processes the request, invoking its tools as needed.
+4. The agent generates a response via the OpenRouter LLM, informed by tool output and conversation memory.
+5. The response, routing decision, and updated client profile are returned to the client.
+
+---
+
+## RAG Pipeline
+
+1. Company knowledge (services, pricing, FAQs) is stored in a **PostgreSQL knowledge base**.
+2. Records are embedded using **SentenceTransformers**.
+3. Embeddings are indexed in **PostgreSQL using the pgvector extension**.
+4. Incoming queries are embedded and matched against the vector store via similarity search.
+5. The most relevant records are retrieved and passed to the requesting agent (Sales or Technical Consultant) to ground its response.
+
+---
+
+## Conversation Memory
+
+- Client profile and conversation history are persisted per session in **PostgreSQL**.
+- Each session maintains a client profile (e.g., name, company, project type, budget, timeline) that is reused across the conversation so agents do not need to re-request known information.
+- Conversation memory is shared across all four agents, allowing context to carry over when a conversation is routed between agents.
+- Sessions can be cleared via the `/reset-session` endpoint.
+
+---
+
+## Tool Calling
+
+Each agent has access to a specific set of tools:
+
+| Tool | Used By | Purpose |
 |---|---|---|
-| `GET` | `/` | Serves the chat frontend |
-| `GET` | `/style.css` | Frontend stylesheet |
-| `GET` | `/script.js` | Frontend script |
-| `POST` | `/chat` | Send a message, receive an agent reply |
-| `POST` | `/reset-session` | Reset a session's memory |
-| `GET` | `/health` | Health check |
-| `GET` | `/metrics` | Basic usage metrics |
+| Company Knowledge Search | Sales, Technical Consultant | Retrieves relevant information from the RAG-backed knowledge base |
+| Cost Estimation | Technical Consultant | Estimates project cost |
+| Timeline Estimation | Technical Consultant | Estimates project delivery timeline |
+| Proposal Generation | Documentation | Generates a structured project proposal summary |
+| Meeting Scheduling | Meeting Coordinator | Creates a meeting booking |
+| Email Confirmation | Meeting Coordinator | Sends a confirmation email upon successful booking |
+
+Agents invoke tools as part of their reasoning process, and tool outputs are used to ground the final response returned to the user.
 
 ---
 
 ## Testing
 
-Unit tests cover the API surface, session memory, and tool functions:
-
-- `test_api.py` — health check, metrics, end-to-end `/chat` flow, session reset, empty-message validation.
-- `test_memory.py` — profile update/retrieval, reset behavior, history tracking.
-- `test_tools.py` — cost estimation, timeline estimation, proposal generation, and meeting request creation, invoked directly.
-
-Run the suite:
+Unit tests cover the API, conversation memory, and tools.
 
 ```bash
 pytest
@@ -584,97 +377,20 @@ pytest
 
 ---
 
-## Logging
+## Logging and Error Handling
 
-Logging is configured once at startup (`logging_config.py`) using Python's standard `logging` module, with level controlled by `LOG_LEVEL`. Key events logged include:
-
-- Supervisor routing decisions (`Session %s routed to '%s' agent`)
-- Agent execution failures, with fallback response substitution
-- Retry triggers, including the computed confidence and reason
-- Vector search failures in the RAG layer
-
-Logs are written to stdout in a single consistent format, suitable for container log aggregation.
-
----
-
-## Design Decisions
-
-**Why FastAPI** — Async-native, minimal boilerplate, automatic OpenAPI documentation, and native Pydantic integration made it the natural fit for a small, testable service exposing a handful of well-typed endpoints.
-
-**Why LangGraph** — The assignment required explicit multi-agent orchestration with conditional routing and retry behavior. LangGraph's `StateGraph` makes the control flow (supervisor → agent → evaluation → conditional retry) explicit and inspectable as a graph, rather than burying routing logic inside nested `if/else` chains.
-
-**Why PostgreSQL + pgvector** — The project originally used ChromaDB for local prototyping. Migrating to PostgreSQL + pgvector moves the knowledge base onto infrastructure that's easy to operate, back up, and scale alongside a relational schema, without introducing a separate specialized vector database service. pgvector's cosine-distance operator integrates directly into standard SQL queries.
-
-**Why Sentence-Transformers (`all-MiniLM-L6-v2`)** — A small, fast, CPU-friendly embedding model that produces good-quality semantic embeddings for a 24-record knowledge base without requiring GPU infrastructure or an external embedding API call per query.
-
-**Why OpenRouter** — Provides a single API surface over multiple underlying model providers, making the model (`MODEL_NAME`) a configuration value rather than a code change. This kept the LLM client code provider-agnostic at the `ChatOpenAI`-compatible interface level.
-
-**Why in-memory Session Memory** — For the scope of this assignment (single-process demo service), an in-memory store with a `threading.Lock` gives correct, simple concurrency behavior without standing up Redis or a database table purely for ephemeral session state. The tradeoff — no persistence across restarts, no multi-instance sharing — is called out explicitly in Limitations.
-
-**Why LLM-driven tool calling (`bind_tools`) over manual invocation** — Initially, tools were invoked unconditionally or behind simple Python `if` checks (e.g., "only estimate cost if `project_type` is set"). This meant the tool logic, not the model, was deciding what "needs" a tool call — which doesn't generalize well as conversations get more varied. Binding tools directly to the LLM lets the model make that judgment call per turn based on the actual conversation, while Python's role shrinks to safe, mechanical execution of whatever the model requests.
-
----
-
-## Challenges
-
-- **Agent routing accuracy** — The supervisor uses keyword matching against fixed word lists (`SALES_KEYWORDS`, `TECH_KEYWORDS`, etc.). Overlapping vocabulary (e.g., "meeting to discuss pricing") can route to an unintended agent, since routing is evaluated in a fixed priority order rather than by intent confidence.
-- **Maintaining conversation memory across turns** — Profile fields are extracted independently on every message via regex; ensuring previously captured fields aren't silently overwritten by a weaker match on a later message required care in `SessionMemory.update_profile`'s "only overwrite if truthy" logic.
-- **Tool orchestration under the new `bind_tools` flow** — Moving from deterministic tool calls to LLM-decided tool calls introduced the possibility of the model looping on tool calls or never terminating with a final answer; this is bounded with a `max_iterations` cap in the tool-calling loop.
-- **Evaluation without a second LLM call** — Designing heuristics that catch genuinely bad responses (empty, refused, clearly truncated) without being so strict that reasonable short answers get needlessly retried required tuning the word-count and question-mark thresholds empirically.
-- **RAG retrieval quality on a small corpus** — With only 24 knowledge records, some queries at the edge of two categories (e.g., "AI project timeline" touching both `ai` and general `pricing`/`erp` timeline content) return plausible but not perfectly ranked matches; embedding quality on short documents at this scale has natural limits.
-
----
-
-## Limitations
-
-- **Keyword-based supervisor** — Routing is regex/keyword-based, not model-based, so it can misroute messages that don't contain expected trigger words.
-- **In-memory session storage** — Session data is lost on process restart and is not shared across multiple server instances.
-- **Mock meeting scheduling** — `create_meeting_request` generates a fake meeting ID and confirmation text; it does not integrate with any real calendar system (Google Calendar, Outlook, etc.).
-- **Rule-based evaluation** — Confidence scoring uses simple heuristics (length, keyword presence, punctuation), not a learned or LLM-based judge.
-- **Single LLM provider** — All agents use one configured model via OpenRouter; there is no runtime provider fallback or multi-model routing.
-- **No authentication** — API endpoints are unauthenticated and CORS is fully open (`allow_origins=["*"]`), appropriate for a local/demo deployment only.
-- **No live deployment** — A Dockerfile is provided, but the project is not deployed to any hosting platform as part of this submission.
+- The application uses structured logging to record request handling, agent routing decisions, and tool execution.
+- API errors are handled gracefully, returning appropriate HTTP status codes and error messages rather than unhandled exceptions.
+- Agent-level failures are isolated so that a failure in one agent does not affect the availability of the overall API.
 
 ---
 
 ## Future Improvements
 
-- Replace keyword-based supervisor routing with an LLM-based intent classifier.
-- Move session memory to Redis (or PostgreSQL) for persistence and multi-instance support.
-- Integrate real calendar APIs for meeting scheduling instead of a mocked confirmation.
-- Add authentication and per-client rate limiting to the API.
-- Build a proper conversation analytics dashboard on top of the existing `/metrics` counters.
-- Add human handoff for low-confidence or explicitly escalated conversations.
-- Support streaming responses over the `/chat` endpoint.
-- Add multi-LLM-provider support with automatic fallback.
-- Deploy to a managed hosting platform with CI/CD.
-
----
-
-## Example Conversation
-
-```
-User: Hi, I'm Sarah from Northbridge Retail. We're looking at building a mobile app, budget around $30k.
-Assistant (sales): Thanks for reaching out, Sarah! For a mobile app project like yours,
-DigitalSofts typically delivers within 8-16 weeks, with pricing in the $8,000-$25,000 range
-depending on complexity — your $30k budget comfortably covers a full-featured build...
-
-User: What tech stack would you use?
-Assistant (technical): For mobile app development, we typically build with Flutter or React
-Native for cross-platform delivery, or native Swift/Kotlin if you need deep platform-specific
-integrations. Given your project, delivery would land in the 8-16 week range...
-
-User: Can we set up a call next week to discuss further?
-Assistant (meeting): You're all set! I've created a meeting request (ID: 7a3f9c21) for Sarah,
-purpose: mobile app project discussion, preferred time: next week. Our team will confirm via
-email shortly.
-```
-
----
-
-## Performance Notes
-
-The system is optimized for correctness and clarity over throughput. Embedding generation and vector search run synchronously per request; with a 24-record knowledge base this adds negligible latency. The dominant cost per request is the LLM round-trip(s), including any tool-calling iterations. No caching, batching, or async LLM streaming is currently implemented.
+- Expand automated test coverage across all agents and tools.
+- Add authentication and rate limiting to the API.
+- Introduce streaming responses for chat interactions.
+- Extend conversation analytics and reporting.
 
 ---
 
