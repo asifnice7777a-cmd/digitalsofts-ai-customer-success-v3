@@ -1,5 +1,6 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+resend
 langchain-groq
 langchain==0.3.7
 langchain-core==0.3.15
